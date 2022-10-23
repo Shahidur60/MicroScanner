@@ -374,26 +374,26 @@ public String getHandshake(){
 //        return greedyService.getGreedyMicroservices(request);
     }
 
-    @CrossOrigin(origins = "*")
-    @RequestMapping(path = "/riskScore", method = RequestMethod.GET)
-    public ResponseEntity<?> getRiskScore() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, URISyntaxException {
-        TrustStrategy acceptingTrustStrategy = (x509Certificates, s) -> true;
-        SSLContext sslContext = org.apache.http.ssl.SSLContexts.custom().loadTrustMaterial(null, acceptingTrustStrategy).build();
-        SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, new NoopHostnameVerifier());
-        CloseableHttpClient httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
-        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setHttpClient(httpClient);
-        RestTemplate restTemplate = new RestTemplate(requestFactory);
-        HttpHeaders headers = new HttpHeaders();
-
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        headers.add("X-Apikeys","accessKey=83a02760539fbcf31e364fe68317e4815cac6695555a163b85e2d551c7da09cb;secretKey=e17d100638dd8dac2dc316453b379f87e3986e0c2630854158cfb7558babbb0d");
-        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
-
-        URI uri = new URI("https://localhost:8834/scans/34");
-        //restTemplate.getForObject("https://localhost:8834/scans/34",httpEntity,String.class);
-        ArrayList response = (ArrayList) restTemplate.exchange("https://localhost:8834/scans/34", HttpMethod.GET, httpEntity, Map.class).getBody().get("vulnerabilities");
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
+//    @CrossOrigin(origins = "*")
+//    @RequestMapping(path = "/riskScore", method = RequestMethod.GET)
+//    public ResponseEntity<?> getRiskScore() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, URISyntaxException {
+//        TrustStrategy acceptingTrustStrategy = (x509Certificates, s) -> true;
+//        SSLContext sslContext = org.apache.http.ssl.SSLContexts.custom().loadTrustMaterial(null, acceptingTrustStrategy).build();
+//        SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, new NoopHostnameVerifier());
+//        CloseableHttpClient httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
+//        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
+//        requestFactory.setHttpClient(httpClient);
+//        RestTemplate restTemplate = new RestTemplate(requestFactory);
+//        HttpHeaders headers = new HttpHeaders();
+//
+//        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+//        headers.add("X-Apikeys","accessKey=83a02760539fbcf31e364fe68317e4815cac6695555a163b85e2d551c7da09cb;secretKey=e17d100638dd8dac2dc316453b379f87e3986e0c2630854158cfb7558babbb0d");
+//        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+//
+//        URI uri = new URI("https://localhost:8834/scans/34");
+//        //restTemplate.getForObject("https://localhost:8834/scans/34",httpEntity,String.class);
+//        ArrayList response = (ArrayList) restTemplate.exchange("https://localhost:8834/scans/34", HttpMethod.GET, httpEntity, Map.class).getBody().get("vulnerabilities");
+//        return new ResponseEntity<>(response, HttpStatus.OK);
+//    }
 
 }

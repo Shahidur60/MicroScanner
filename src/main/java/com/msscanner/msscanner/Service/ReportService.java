@@ -46,7 +46,7 @@ public class ReportService {
     public Double getAPIGatewayResponse(@RequestBody RequestContext request) throws Exception
     {
         ResponseContext responseContext = restDiscoveryService.generateResponseContext(request);
-        double risk_1;
+        Double risk_1;
         SharedLibraryContext sharedLibraryContext = libraryService.getSharedLibraries(request);
         String test = sharedLibraryContext.getSharedLibraries().toString();
         System.out.println(test);
@@ -73,7 +73,7 @@ public class ReportService {
         Boolean con = test.toLowerCase().contains("gatewayserver");
         if (con)
         {
-            risk_1 = Float.valueOf(0);
+            risk_1 = Double.valueOf(0);
         }
         else {
             severity = Double.valueOf(Float.valueOf(Major));
@@ -168,7 +168,7 @@ public class ReportService {
             {
 
                 frequency = Double.valueOf(entry.getValue().getCount());
-                if(getLikelihood(frequency) == Double.valueOf(1))
+                if(Objects.equals(getLikelihood(frequency), Double.valueOf(1)))
                 {
                     severity = Double.valueOf(Major);
                 } else if (getLikelihood(frequency) == 0.50) {
@@ -220,7 +220,13 @@ public class ReportService {
         System.out.println(count);
         frequency = Double.valueOf(hardCodedEndpointsContext.getTotalHardcodedEndpoints());
         Double newLike = Double.valueOf(0);
-        newLike = frequency / count;
+        if (count == 0)
+        {
+            count = 1;
+        }else {
+            newLike = frequency / count;
+        }
+
         if (newLike >= 0.50 && newLike < 0.75)
         {
             severity = Double.valueOf(Major);
@@ -243,7 +249,7 @@ public class ReportService {
             return risk_6 = 0.00;
         } else {
             frequency = Double.valueOf(greedyService1.getGreedyMicroservices().size());
-            if(getLikelihood(frequency) == Double.valueOf(1))
+            if(Objects.equals(getLikelihood(frequency), 1.0))
             {
                 severity = Double.valueOf(Major);
             } else if (getLikelihood(frequency) == 0.50) {
