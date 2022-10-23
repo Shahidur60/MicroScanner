@@ -5,19 +5,45 @@ import com.msscanner.msscanner.Service.*;
 import com.msscanner.msscanner.discovery.context.RequestContext;
 import com.msscanner.msscanner.discovery.context.ResponseContext;
 import com.msscanner.msscanner.discovery.context.RestEntityContext;
+import com.msscanner.msscanner.discovery.context.RestFlowContext;
 import com.msscanner.msscanner.discovery.model.RestEntity;
 import com.msscanner.msscanner.discovery.model.RestFlow;
+import com.msscanner.msscanner.discovery.service.ResourceService;
 import com.msscanner.msscanner.model.SharedIntimacy;
+import com.msscanner.msscanner.model.SharedLibrary;
 import com.msscanner.msscanner.model.context.*;
 import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpoint;
 import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpointType;
+import javassist.CtClass;
 import lombok.AllArgsConstructor;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.*;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import javax.net.ssl.SSLContext;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -35,6 +61,9 @@ public class BaseController {
     private final EntityService entityService;
     private final WrongCutsService wrongCutsService;
     private final GreedyService greedyService;
+
+    @Autowired
+    private ReportService reportService;
 
     @RequestMapping(value = "/base", method = RequestMethod.GET)
     public String populateCourse(){
@@ -75,10 +104,10 @@ public String getHandshake(){
         now = System.currentTimeMillis();
         times.put("Shared Library", now - curr);
 
-        curr = System.currentTimeMillis();
-        context.setWrongCutsContext(getWrongCuts(request));
-        now = System.currentTimeMillis();
-        times.put("Wrong Cuts", now - curr);
+//        curr = System.currentTimeMillis();
+//        context.setWrongCutsContext(getWrongCuts(request));
+//        now = System.currentTimeMillis();
+//        times.put("Wrong Cuts", now - curr);
 
         curr = System.currentTimeMillis();
         context.setHardCodedEndpointsContext(getHardcodedEndpoints(request));
@@ -105,10 +134,10 @@ public String getHandshake(){
         now = System.currentTimeMillis();
         times.put("API Gateway", now - curr);
 
-        curr = System.currentTimeMillis();
-        context.setInappropriateServiceIntimacyContext(getInappropriateServiceIntimacy(request));
-        now = System.currentTimeMillis();
-        times.put("ISI", now - curr);
+//        curr = System.currentTimeMillis();
+//        context.setInappropriateServiceIntimacyContext(getInappropriateServiceIntimacy(request));
+//        now = System.currentTimeMillis();
+//        times.put("ISI", now - curr);
 
         curr = System.currentTimeMillis();
         context.setTooManyStandardsContext(getTooManyStandards(request));
@@ -134,11 +163,82 @@ public String getHandshake(){
                 .collect(Collectors.toSet()));
     }
 
+    @RequestMapping(path = "/rad", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public ResponseContext rad(@RequestBody RequestContext request) {
+        return restDiscoveryService.generateResponseContext(request);
+    }
+    @Autowired
+    private final ResourceService resourceService;
+
+    @RequestMapping(path = "/prop", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Properties prop(@RequestBody RequestContext request) throws IOException, XmlPullParserException {
+        List<String> resourcePaths = resourceService.getResourcePaths(request.getPathToCompiledMicroservices());
+
+        for (String path : resourcePaths) {
+            List<CtClass> ctClasses = resourceService.getCtClasses(path, request.getOrganizationPath());
+
+            Set<Properties> propertiesSet = resourceService.getProperties(path, request.getOrganizationPath());
+            List<String> fileNames = resourceService.getPomXML(request.getPathToCompiledMicroservices());
+            MavenXpp3Reader reader = new MavenXpp3Reader();
+            //System.out.println(reader.read(new FileReader(fileNames.get(0))).getDependencies().toString());
+
+
+           // System.out.println(fileNames.toString());
+            Properties properties;
+            if (propertiesSet.size() > 0) {
+                properties = propertiesSet.iterator().next();
+
+//                 if(properties.getProperty("keycloak" ).toString().equals(""))
+//                 {
+//                     return Properties;
+//                 }
+                return properties;
+                //JSONObject jsonObject = new JSONObject(properties);
+                //return properties.toString();
+            } else properties = null;
+
+            // print the properties for debug
+            // Helper.dumpProperties(properties, path);
+//            JSONObject jsonObject = new JSONObject(properties.toString());
+//            return jsonObject;
+            System.out.println(properties);
+
+        }
+
+
+        return null;
+    }
+    @RequestMapping(path = "/caching", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getCaching(@RequestBody RequestContext request) throws IOException, XmlPullParserException {
+        return reportService.getCaching(request);
+    }
+
+    @RequestMapping(path = "/access", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getAccessControl(@RequestBody RequestContext request) throws IOException, XmlPullParserException {
+        return reportService.getAccessControl(request);
+    }
+
     @CrossOrigin(origins = "*")
     @RequestMapping(path = "/sharedLibraries", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public SharedLibraryContext getSharedLibraries(@RequestBody RequestContext request) throws Exception {
         return libraryService.getSharedLibraries(request);
     }
+
+    @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/getAPIGateway", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getAPIGatewayResponse(@RequestBody RequestContext request) throws Exception
+    {
+        return reportService.getAPIGatewayResponse(request);
+    }
+
+    @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/improperDependency", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getImproperDependency(@RequestBody RequestContext request) throws Exception
+    {
+        return reportService.getImproperDependency(request);
+    }
+
+
 
     @CrossOrigin(origins = "*")
     @RequestMapping(path = "/wrongCuts", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
@@ -171,6 +271,22 @@ public String getHandshake(){
     }
 
     @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/gethardcodedEndpoints", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getHardcodedEndpointsScore(@RequestBody RequestContext request){
+
+        return reportService.getHardcodedEndpointsScore(request);
+    }
+
+
+        @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/netcom", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getNetworkCommunication(@RequestBody RequestContext request)
+    {
+        return reportService.getNetworkCommunication(request);
+    }
+
+
+    @CrossOrigin(origins = "*")
     @RequestMapping(path = "/cyclicDependency", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public boolean getCyclicDependency(@RequestBody RequestContext request){
         return cyclicDependencyService.getCyclicDependencies(request);
@@ -186,6 +302,15 @@ public String getHandshake(){
     @RequestMapping(path = "/esbUsage", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public ESBContext getESBUsage(@RequestBody RequestContext request) {
         return esbService.getESBContext(request);
+    }
+
+    @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/getESB", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getESBScore(@RequestBody RequestContext request) {
+
+        return reportService.getESBScore(request);
+
+//        return esbService.getESBContext(request);
     }
 
     @CrossOrigin(origins = "*")
@@ -240,6 +365,35 @@ public String getHandshake(){
     @RequestMapping(path = "/microservicesGreedy", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public MicroservicesGreedyContext getMicroservicesGreedy(@RequestBody RequestContext request){
         return greedyService.getGreedyMicroservices(request);
+    }
+
+    @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/getUnproperMSUtilization", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getUnproperMSUtilization(@RequestBody RequestContext request){
+        return reportService.getImproperMSUtilization(request);
+//        return greedyService.getGreedyMicroservices(request);
+    }
+
+    @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/riskScore", method = RequestMethod.GET)
+    public ResponseEntity<?> getRiskScore() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, URISyntaxException {
+        TrustStrategy acceptingTrustStrategy = (x509Certificates, s) -> true;
+        SSLContext sslContext = org.apache.http.ssl.SSLContexts.custom().loadTrustMaterial(null, acceptingTrustStrategy).build();
+        SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, new NoopHostnameVerifier());
+        CloseableHttpClient httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
+        requestFactory.setHttpClient(httpClient);
+        RestTemplate restTemplate = new RestTemplate(requestFactory);
+        HttpHeaders headers = new HttpHeaders();
+
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        headers.add("X-Apikeys","accessKey=83a02760539fbcf31e364fe68317e4815cac6695555a163b85e2d551c7da09cb;secretKey=e17d100638dd8dac2dc316453b379f87e3986e0c2630854158cfb7558babbb0d");
+        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+
+        URI uri = new URI("https://localhost:8834/scans/34");
+        //restTemplate.getForObject("https://localhost:8834/scans/34",httpEntity,String.class);
+        ArrayList response = (ArrayList) restTemplate.exchange("https://localhost:8834/scans/34", HttpMethod.GET, httpEntity, Map.class).getBody().get("vulnerabilities");
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
 }

@@ -346,7 +346,7 @@ public class ResourceService {
      * @return if a {@link JarEntry} is a properties file
      */
     private boolean isPropertiesFile(JarEntry entry) {
-        return entry.getName().endsWith(".properties");
+        return entry.getName().endsWith(".properties") || entry.getName().endsWith(".yml");
     }
 
     private boolean isYamlFile(JarEntry entry) {
