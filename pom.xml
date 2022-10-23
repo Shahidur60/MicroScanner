@@ -141,6 +141,10 @@
             <name>Local Nexus</name>
             <url>https://repo.spring.io/release</url>
         </pluginRepository>
+<!--        <pluginRepository>-->
+<!--            <id>maven2</id>-->
+<!--            <url>https://repo.maven.apache.org/maven2/</url>-->
+<!--        </pluginRepository>-->
     </pluginRepositories>
     <build>
         <plugins>
@@ -188,5 +192,8 @@
             </plugin>
         </plugins>
     </build>
+
+
+
 
 </project>

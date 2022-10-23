@@ -295,5 +295,9 @@ public class ReportService {
             risk_8 = severity * getLikelihood(frequency) * frequency;
             return risk_8;
         }
+        else {
+            return 0.00;
+        }
+
     }
 }
