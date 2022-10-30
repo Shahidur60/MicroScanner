@@ -4,13 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.springframework.beans.factory.annotation.Value;
 
 
 @Getter
 @Setter
 @ToString
-@AllArgsConstructor
+//@AllArgsConstructor
 public class RequestContext {
+
     private String pathToCompiledMicroservices;
     private String organizationPath;
     private String outputPath;

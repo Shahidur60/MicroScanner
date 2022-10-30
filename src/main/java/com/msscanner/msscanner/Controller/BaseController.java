@@ -14,8 +14,10 @@ import com.msscanner.msscanner.model.SharedLibrary;
 import com.msscanner.msscanner.model.context.*;
 import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpoint;
 import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpointType;
+import com.msscanner.msscanner.util.FileUtil;
 import javassist.CtClass;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
@@ -28,6 +30,7 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +51,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class BaseController {
 
     private final APIService apiService;
@@ -64,6 +67,9 @@ public class BaseController {
 
     @Autowired
     private ReportService reportService;
+
+    @Autowired
+    private FileUtil fileUtil;
 
     @RequestMapping(value = "/base", method = RequestMethod.GET)
     public String populateCourse(){
@@ -247,6 +253,13 @@ public String getHandshake(){
     }
 
     @CrossOrigin(origins = "*")
+    @RequestMapping(path = "/risk", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
+    public Double getRisk(@RequestBody RequestContext request) throws Exception {
+        request.setPathToCompiledMicroservices(fileUtil.getMicroservicePath());
+        return reportService.getTotalRiskScore(request);
+    }
+
+        @CrossOrigin(origins = "*")
     @RequestMapping(path = "/hardcodedEndpoints", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public HardCodedEndpointsContext getHardcodedEndpoints(@RequestBody RequestContext request){
         HardCodedEndpointsContext hardCodedEndpointsContext = new HardCodedEndpointsContext();

@@ -30,7 +30,14 @@ public class ReportService {
     private final GreedyService greedyService;
     @Autowired
     private final ResourceService resourceService;
+
+
     private final ESBService esbService;
+
+    private Double weight_APIGateway = Double.valueOf(0),
+            weight_NetworkCommunication = Double.valueOf(0),weight_AccessControl = Double.valueOf(0),
+            weight_ImproperDependency = Double.valueOf(0),weight_HardcodedEndpointsScore = Double.valueOf(0),weight_ImproperMSUtilization = Double.valueOf(0),weight_Caching = Double.valueOf(0),weight_ESBScore = Double.valueOf(0);
+
 
     public ReportService(LibraryService libraryService, RestService restDiscoveryService, GreedyService greedyService, ResourceService resourceService, ESBService esbService) {
         this.libraryService = libraryService;
@@ -68,6 +75,7 @@ public class ReportService {
             micro.add(end);
             i++;
         }
+        System.out.println(i);
 
         test = test.substring(micro.get(2), micro.get(3));
         Boolean con = test.toLowerCase().contains("gatewayserver");
@@ -76,9 +84,11 @@ public class ReportService {
             risk_1 = Double.valueOf(0);
         }
         else {
-            severity = Double.valueOf(Float.valueOf(Major));
-            frequency = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
+            severity = Double.valueOf(Double.valueOf(Major));
+            frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+            System.out.println(responseContext.getRestEntityContexts().size());
             risk_1 = severity * getLikelihood(frequency) * frequency;
+            weight_APIGateway = frequency;
         }
         return risk_1;
     }
@@ -113,17 +123,19 @@ public class ReportService {
                 String restMethods = propertiesSet.iterator().next().getProperty("cors-allowed-methods").toString();
                 if (restMethods.contains("GET") && restMethods.contains("DELETE") && restMethods.contains("POST") && restMethods.contains("PUT"))
                 {
-                    return risk_2 = Double.valueOf(0);
+                    return risk_2 = 0.00;
                 }
                 else {
                     severity = Double.valueOf(Significant);
-                    frequency = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
-                    return risk_2 = severity*frequency*getLikelihood(frequency);
+                    frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                     risk_2 = severity*frequency*getLikelihood(frequency);
+                     weight_NetworkCommunication = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                    return risk_2;
                 }
             } else properties = null;
 
         }
-        return null;
+        return 0.00;
     }
 
     public Double getAccessControl(@RequestBody RequestContext request)
@@ -144,15 +156,16 @@ public class ReportService {
                  if(properties.getProperty("keycloak" ).equals(""))
                  {
                      severity = Double.valueOf(Significant);
-                     frequency = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
+                     frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
                      risk_3 = severity*frequency*getLikelihood(frequency);
+                     weight_AccessControl = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
                      return risk_3;
                  }
 
             }
         }
 
-        return null;
+        return 0.00;
     }
 
     public Double getImproperDependency(@RequestBody RequestContext request) throws Exception
@@ -177,6 +190,7 @@ public class ReportService {
                     severity = Double.valueOf(Minimal);
                 }
                 risk_4 = severity*frequency*getLikelihood(frequency);
+                weight_ImproperDependency = Double.valueOf(entry.getValue().getCount());
                 return risk_4;
             }
         }
@@ -219,6 +233,7 @@ public class ReportService {
 
         System.out.println(count);
         frequency = Double.valueOf(hardCodedEndpointsContext.getTotalHardcodedEndpoints());
+        weight_HardcodedEndpointsScore = Double.valueOf(hardCodedEndpointsContext.getTotalHardcodedEndpoints());
         Double newLike = Double.valueOf(0);
         if (count == 0)
         {
@@ -243,12 +258,14 @@ public class ReportService {
     public Double getImproperMSUtilization(RequestContext request) {
         Double risk_6;
         severity = 0.00;
+        weight_ImproperMSUtilization = 0.00;
         MicroservicesGreedyContext greedyService1 = greedyService.getGreedyMicroservices(request);
         if(greedyService1.getGreedyMicroservices().size() > 0)
         {
             return risk_6 = 0.00;
         } else {
             frequency = Double.valueOf(greedyService1.getGreedyMicroservices().size());
+            weight_ImproperMSUtilization = frequency;
             if(Objects.equals(getLikelihood(frequency), 1.0))
             {
                 severity = Double.valueOf(Major);
@@ -260,11 +277,13 @@ public class ReportService {
             risk_6 = severity*frequency*getLikelihood(frequency);
             return risk_6;
         }
+
     }
 
     public Double getCaching(RequestContext request) {
         ResponseContext responseContext = restDiscoveryService.generateResponseContext(request);
         double risk_7;
+        weight_Caching = 0.00;
         List<String> resourcePaths = resourceService.getResourcePaths(request.getPathToCompiledMicroservices());
         for (String path : resourcePaths) {
             List<CtClass> ctClasses = resourceService.getCtClasses(path, request.getOrganizationPath());
@@ -280,6 +299,7 @@ public class ReportService {
                     severity = Double.valueOf(Float.valueOf(Major));
                     frequency = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
                     risk_7 = severity * getLikelihood(frequency) * frequency;
+                    weight_Caching = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
                     return risk_7;
                 }
                 else {
@@ -288,17 +308,19 @@ public class ReportService {
 
             }
         }
-        return null;
+        return 0.00;
     }
 
     public Double getESBScore(RequestContext request) {
         ResponseContext responseContext = restDiscoveryService.generateResponseContext(request);
         double risk_8;
+        weight_ESBScore = 0.00;
         if (esbService.getESBContext(request).getCandidateESBs().size() > 0)
         {
             severity = Double.valueOf(Float.valueOf(Major));
             frequency = Double.valueOf(esbService.getESBContext(request).getCandidateESBs().size());
             risk_8 = severity * getLikelihood(frequency) * frequency;
+            weight_ESBScore = Double.valueOf(esbService.getESBContext(request).getCandidateESBs().size());
             return risk_8;
         }
         else {
@@ -306,4 +328,54 @@ public class ReportService {
         }
 
     }
+    public Double getTotalRiskScore(RequestContext request) throws Exception {
+
+//        System.out.println(weight_APIGateway);
+//        System.out.println(weight_ImproperMSUtilization);
+//        System.out.println(weight_AccessControl);
+        double total_risk = 0.00;
+
+//        long curr = System.currentTimeMillis();
+//        ResponseContext responseContext = restDiscoveryService.generateResponseContext(request);
+//        long now = System.currentTimeMillis();
+//        times.put("Bytecode Analysis", now - curr);
+
+        double risk_APIGateway = getAPIGatewayResponse(request);
+
+        double risk_network = getNetworkCommunication(request);
+
+        double risk_AccessControl = getAccessControl(request);
+
+        double risk_ImproperDependency = getImproperDependency(request);
+
+        double risk_HardcodedEndpointsScore = getHardcodedEndpointsScore(request);
+
+        double risk_ImproperMSUtilization = getImproperMSUtilization(request);
+
+        double risk_Caching = getCaching(request);
+
+        double risk_ESB = getESBScore(request);
+
+
+        double total_weight = weight_APIGateway + weight_NetworkCommunication +  + weight_AccessControl + weight_ImproperDependency + weight_HardcodedEndpointsScore +
+                weight_Caching + weight_ImproperMSUtilization + weight_ESBScore;
+
+        if (total_weight <= 0.00)
+        {
+            total_risk = 0.00;
+        }
+        else {
+            total_risk = ((risk_APIGateway * weight_APIGateway) + (risk_network * weight_NetworkCommunication) + (risk_AccessControl * weight_AccessControl) +
+                    (risk_ImproperDependency + weight_ImproperDependency) + (risk_HardcodedEndpointsScore * weight_HardcodedEndpointsScore) +
+                    (risk_Caching * weight_Caching) + (risk_ImproperMSUtilization + weight_ImproperMSUtilization) + (risk_ESB * weight_ESBScore)) / total_weight;
+
+            return total_risk;
+        }
+
+//
+//        String risk = "The risk score: "+ " "+  weight_APIGateway+ " " + weight_ImproperMSUtilization + " " + weight_AccessControl;
+        return null;
+    }
+
+
 }
