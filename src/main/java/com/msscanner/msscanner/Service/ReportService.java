@@ -1,6 +1,7 @@
 package com.msscanner.msscanner.Service;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msscanner.msscanner.discovery.context.RequestContext;
 import com.msscanner.msscanner.discovery.context.ResponseContext;
 import com.msscanner.msscanner.discovery.context.RestEntityContext;
@@ -15,11 +16,16 @@ import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpoint;
 import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpointType;
 import javassist.CtClass;
 import org.apache.commons.lang.StringUtils;
+import org.apache.logging.log4j.spi.LoggerRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ReportService {
@@ -34,9 +40,19 @@ public class ReportService {
 
     private final ESBService esbService;
 
+     //processBuilder.command("cmd.exe", "/c", "docker scan --json ostock/organization-service:0.0.1-SNAPSHOT > gatewayserver-output.json");
+
+    private String cmd = "cmd.exe";
+    private String driveName = "/c";
+    private String synkCommand = "docker scan --json ostock/organization-service:0.0.1-SNAPSHOT > gatewayserver-output.json";
+
+    private String dataReading = "gatewayserver-output.json";
+
+
     private Double weight_APIGateway = Double.valueOf(0),
             weight_NetworkCommunication = Double.valueOf(0),weight_AccessControl = Double.valueOf(0),
-            weight_ImproperDependency = Double.valueOf(0),weight_HardcodedEndpointsScore = Double.valueOf(0),weight_ImproperMSUtilization = Double.valueOf(0),weight_Caching = Double.valueOf(0),weight_ESBScore = Double.valueOf(0);
+            weight_ImproperDependency = Double.valueOf(0),weight_HardcodedEndpointsScore = Double.valueOf(0),weight_ImproperMSUtilization = Double.valueOf(0),weight_Caching = Double.valueOf(0),weight_ESBScore = Double.valueOf(0),
+            weigth_SynkScanning =1.00;
 
 
     public ReportService(LibraryService libraryService, RestService restDiscoveryService, GreedyService greedyService, ResourceService resourceService, ESBService esbService) {
@@ -76,15 +92,22 @@ public class ReportService {
             i++;
         }
         System.out.println(i);
-
+        Boolean resource = false;
         test = test.substring(micro.get(2), micro.get(3));
         Boolean con = test.toLowerCase().contains("gatewayserver");
-        if (con)
+        List<String> resourcePaths = resourceService.getResourcePaths(request.getPathToCompiledMicroservices());
+        for (String path : resourcePaths) {
+            if (path.contains("gatewayserver")){
+                resource = true;
+                break;
+            }
+        }
+        if (con || resource)
         {
             risk_1 = Double.valueOf(0);
         }
         else {
-            severity = Double.valueOf(Double.valueOf(Major));
+            severity = Double.valueOf(Major);
             frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
             System.out.println(responseContext.getRestEntityContexts().size());
             risk_1 = severity * getLikelihood(frequency) * frequency;
@@ -356,9 +379,11 @@ public class ReportService {
 
         double risk_ESB = getESBScore(request);
 
+        double risk_synkScanning = getContainerVulnerabilities();
+
 
         double total_weight = weight_APIGateway + weight_NetworkCommunication +  + weight_AccessControl + weight_ImproperDependency + weight_HardcodedEndpointsScore +
-                weight_Caching + weight_ImproperMSUtilization + weight_ESBScore;
+                weight_Caching + weight_ImproperMSUtilization + weight_ESBScore + weigth_SynkScanning;
 
         if (total_weight <= 0.00)
         {
@@ -367,7 +392,7 @@ public class ReportService {
         else {
             total_risk = ((risk_APIGateway * weight_APIGateway) + (risk_network * weight_NetworkCommunication) + (risk_AccessControl * weight_AccessControl) +
                     (risk_ImproperDependency + weight_ImproperDependency) + (risk_HardcodedEndpointsScore * weight_HardcodedEndpointsScore) +
-                    (risk_Caching * weight_Caching) + (risk_ImproperMSUtilization + weight_ImproperMSUtilization) + (risk_ESB * weight_ESBScore)) / total_weight;
+                    (risk_Caching * weight_Caching) + (risk_ImproperMSUtilization + weight_ImproperMSUtilization) + (risk_ESB * weight_ESBScore) + (risk_synkScanning * weigth_SynkScanning)) / total_weight;
 
             return total_risk;
         }
@@ -375,6 +400,47 @@ public class ReportService {
 //
 //        String risk = "The risk score: "+ " "+  weight_APIGateway+ " " + weight_ImproperMSUtilization + " " + weight_AccessControl;
         return null;
+    }
+
+    public Double getContainerVulnerabilities() throws IOException, InterruptedException {
+        Double synkRisk = null;
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        processBuilder.command(cmd, driveName, synkCommand);
+        //processBuilder.start();
+
+        //TimeUnit.MINUTES.sleep(1);
+        //wait(100);
+        ObjectMapper objectMapper = new ObjectMapper();
+        ArrayList<LinkedHashMap> dockerScanOutput =  objectMapper.readValue(new File(dataReading),ArrayList.class);
+        // Mapping
+        Map<String, LinkedHashMap<String,LinkedHashMap<String,ArrayList<LinkedHashMap<String,String>>>>> vulmap = dockerScanOutput.get(0);
+        String baseImage = vulmap.get("docker").get("baseImageRemediation").get("advice").get(0).get("message");
+        String lines[] = baseImage.split("\\r?\\n");
+        String out [] = lines[1].split(" ");
+        Map<String, Double> result = new HashMap<>();
+        result.put("total", Double.valueOf(out[2]));
+        result.put("critical", Double.valueOf(out[17]));
+        result.put("high", Double.valueOf(out[19]));
+        result.put("medium", Double.valueOf(out[21]));
+        result.put("low", Double.valueOf(out[23]));
+        if(Double.valueOf(out[19]) > 0 && Double.valueOf(out[17]) >0)
+        {
+            if(Double.valueOf(out[23]) > 10)
+            {
+                severity = Double.valueOf(Significant);
+                likelihood = getLikelihood(Double.valueOf(out[19]) + Double.valueOf(out[17]));
+                synkRisk = severity * likelihood;
+            }
+        } else if (Double.valueOf(out[23])> 20) {
+            severity = Double.valueOf(Major);
+            likelihood = getLikelihood(Double.valueOf(out[2]));
+            synkRisk = severity * likelihood;
+        }
+        else {
+            synkRisk =0.00;
+        }
+        return synkRisk;
+
     }
 
 

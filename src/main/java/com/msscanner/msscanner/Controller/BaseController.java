@@ -1,6 +1,7 @@
 package com.msscanner.msscanner.Controller;
 
 
+import com.msscanner.msscanner.Repositories.ReportRepository;
 import com.msscanner.msscanner.Service.*;
 import com.msscanner.msscanner.discovery.context.RequestContext;
 import com.msscanner.msscanner.discovery.context.ResponseContext;
@@ -9,6 +10,7 @@ import com.msscanner.msscanner.discovery.context.RestFlowContext;
 import com.msscanner.msscanner.discovery.model.RestEntity;
 import com.msscanner.msscanner.discovery.model.RestFlow;
 import com.msscanner.msscanner.discovery.service.ResourceService;
+import com.msscanner.msscanner.model.Report;
 import com.msscanner.msscanner.model.SharedIntimacy;
 import com.msscanner.msscanner.model.SharedLibrary;
 import com.msscanner.msscanner.model.context.*;
@@ -64,6 +66,9 @@ public class BaseController {
     private final EntityService entityService;
     private final WrongCutsService wrongCutsService;
     private final GreedyService greedyService;
+
+    @Autowired
+    private ReportRepository reportRepository;
 
     @Autowired
     private ReportService reportService;
@@ -170,7 +175,8 @@ public String getHandshake(){
     }
 
     @RequestMapping(path = "/rad", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
-    public ResponseContext rad(@RequestBody RequestContext request) {
+    public ResponseContext rad(@RequestBody RequestContext request) throws FileNotFoundException {
+        request.setPathToCompiledMicroservices(fileUtil.getMicroservicePath());
         return restDiscoveryService.generateResponseContext(request);
     }
     @Autowired
@@ -221,6 +227,7 @@ public String getHandshake(){
 
     @RequestMapping(path = "/access", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public Double getAccessControl(@RequestBody RequestContext request) throws IOException, XmlPullParserException {
+        request.setPathToCompiledMicroservices(fileUtil.getMicroservicePath());
         return reportService.getAccessControl(request);
     }
 
@@ -255,11 +262,26 @@ public String getHandshake(){
     @CrossOrigin(origins = "*")
     @RequestMapping(path = "/risk", method = RequestMethod.GET, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public Double getRisk(@RequestBody RequestContext request) throws Exception {
+        Map<String, Long> times = new HashMap<>();
         request.setPathToCompiledMicroservices(fileUtil.getMicroservicePath());
-        return reportService.getTotalRiskScore(request);
+
+        long curr = System.currentTimeMillis();
+        Double risk = reportService.getTotalRiskScore(request);
+        long now = System.currentTimeMillis();
+        times.put("Total Time Needed", now - curr);
+
+        Report report = new Report();
+        report.setRisk_score(risk);
+        report.setTimeTaken(now-curr);
+        reportRepository.save(report);
+
+
+        System.out.println(times);
+
+        return risk;
     }
 
-        @CrossOrigin(origins = "*")
+    @CrossOrigin(origins = "*")
     @RequestMapping(path = "/hardcodedEndpoints", method = RequestMethod.POST, produces = "application/json; charset=UTF-8", consumes = {"text/plain", "application/*"})
     public HardCodedEndpointsContext getHardcodedEndpoints(@RequestBody RequestContext request){
         HardCodedEndpointsContext hardCodedEndpointsContext = new HardCodedEndpointsContext();
@@ -409,4 +431,8 @@ public String getHandshake(){
 //        return new ResponseEntity<>(response, HttpStatus.OK);
 //    }
 
+    @GetMapping("/get-docker-scan-result")
+    public ResponseEntity<?> getDockerScanResult() throws IOException, InterruptedException {
+        return new ResponseEntity<>(reportService.getContainerVulnerabilities(), HttpStatus.OK);
+    }
 }

@@ -8,6 +8,7 @@ import com.msscanner.msscanner.model.persistency.DatabaseType;
 import com.msscanner.msscanner.model.standards.BusinessType;
 import com.msscanner.msscanner.model.standards.PresentationType;
 import lombok.AllArgsConstructor;
+import org.apache.commons.io.IOUtils;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.Plugin;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.InputStream;
 import java.util.*;
 
 @Service

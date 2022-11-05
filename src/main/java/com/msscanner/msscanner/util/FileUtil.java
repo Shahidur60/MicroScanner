@@ -1,5 +1,6 @@
 package com.msscanner.msscanner.util;
 
+import org.apache.commons.io.IOUtils;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -11,11 +12,17 @@ public class FileUtil {
 
     public String getMicroservicePath() throws FileNotFoundException {
         File file = new File("microservice-compile-path.txt");
-        Scanner sc = new Scanner(file);
         String filePath = "";
-        while (sc.hasNextLine()) {
-            filePath = sc.next();
+        Scanner sc = new Scanner(file);
+        try {
+
+            while (sc.hasNextLine()) {
+                filePath = sc.next();
+            }
+        }finally {
+            IOUtils.closeQuietly(sc);
         }
+
 
         return filePath;
     }
