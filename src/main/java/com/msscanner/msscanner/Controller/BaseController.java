@@ -28,6 +28,9 @@ import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -435,4 +438,12 @@ public String getHandshake(){
     public ResponseEntity<?> getDockerScanResult() throws IOException, InterruptedException {
         return new ResponseEntity<>(reportService.getContainerVulnerabilities(), HttpStatus.OK);
     }
+
+    @CrossOrigin(origins = "*")
+        @RequestMapping(path = "/getReport", method = RequestMethod.GET)
+    public void getGeneratedReport() throws IOException {
+        reportService.getDataFromExcel();
+    }
+
+
 }

@@ -2,11 +2,13 @@ package com.msscanner.msscanner.Service;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.msscanner.msscanner.Repositories.ReportRepository;
 import com.msscanner.msscanner.discovery.context.RequestContext;
 import com.msscanner.msscanner.discovery.context.ResponseContext;
 import com.msscanner.msscanner.discovery.context.RestEntityContext;
 import com.msscanner.msscanner.discovery.model.RestEntity;
 import com.msscanner.msscanner.discovery.service.ResourceService;
+import com.msscanner.msscanner.model.Report;
 import com.msscanner.msscanner.model.SharedLibrary;
 import com.msscanner.msscanner.model.context.ESBContext;
 import com.msscanner.msscanner.model.context.HardCodedEndpointsContext;
@@ -17,11 +19,16 @@ import com.msscanner.msscanner.model.hardcodedEndpoint.HardcodedEndpointType;
 import javassist.CtClass;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.spi.LoggerRegistry;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
@@ -36,6 +43,9 @@ public class ReportService {
     private final GreedyService greedyService;
     @Autowired
     private final ResourceService resourceService;
+
+    @Autowired
+    private ReportRepository reportRepository;
 
 
     private final ESBService esbService;
@@ -110,7 +120,7 @@ public class ReportService {
             severity = Double.valueOf(Major);
             frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
             System.out.println(responseContext.getRestEntityContexts().size());
-            risk_1 = severity * getLikelihood(frequency) * frequency;
+            risk_1 = severity * getLikelihood(frequency);
             weight_APIGateway = frequency;
         }
         return risk_1;
@@ -140,18 +150,36 @@ public class ReportService {
         for (String path : resourcePaths) {
 
             Set<Properties> propertiesSet = resourceService.getProperties(path, request.getOrganizationPath());
-
+            String restMethods = null;
             Properties properties;
             if (propertiesSet.size() > 0) {
-                String restMethods = propertiesSet.iterator().next().getProperty("cors-allowed-methods").toString();
-                if (restMethods.contains("GET") && restMethods.contains("DELETE") && restMethods.contains("POST") && restMethods.contains("PUT"))
+                if(propertiesSet == null)
+                {
+                    severity = Double.valueOf(Significant);
+                    frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                    risk_2 = severity*getLikelihood(frequency);
+                    weight_NetworkCommunication = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                    return risk_2;
+                }
+                else {
+                     restMethods = propertiesSet.iterator().next().getProperty("cors-allowed-methods");
+                }
+
+                if(restMethods ==null){
+                    severity = Double.valueOf(Significant);
+                    frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                    risk_2 = severity*getLikelihood(frequency);
+                    weight_NetworkCommunication = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
+                    return risk_2;
+                }
+                else if (restMethods.contains("GET") && restMethods.contains("DELETE") && restMethods.contains("POST") && restMethods.contains("PUT"))
                 {
                     return risk_2 = 0.00;
                 }
                 else {
                     severity = Double.valueOf(Significant);
                     frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
-                     risk_2 = severity*frequency*getLikelihood(frequency);
+                     risk_2 = severity*getLikelihood(frequency);
                      weight_NetworkCommunication = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
                     return risk_2;
                 }
@@ -176,11 +204,11 @@ public class ReportService {
             if (propertiesSet.size() > 0) {
                 properties = propertiesSet.iterator().next();
 
-                 if(properties.getProperty("keycloak" ).equals(""))
+                 if( properties.getProperty("keycloak" ) == null ||properties.getProperty("keycloak" ).equals(""))
                  {
                      severity = Double.valueOf(Significant);
                      frequency = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
-                     risk_3 = severity*frequency*getLikelihood(frequency);
+                     risk_3 = severity*getLikelihood(frequency);
                      weight_AccessControl = Double.valueOf(Double.valueOf(responseContext.getRestEntityContexts().size()));
                      return risk_3;
                  }
@@ -203,7 +231,7 @@ public class ReportService {
             if (entry.getValue().getCount() > 0)
             {
 
-                frequency = Double.valueOf(entry.getValue().getCount());
+                frequency = Double.valueOf(sharedLibraries.size());
                 if(Objects.equals(getLikelihood(frequency), Double.valueOf(1)))
                 {
                     severity = Double.valueOf(Major);
@@ -212,7 +240,7 @@ public class ReportService {
                 }else {
                     severity = Double.valueOf(Minimal);
                 }
-                risk_4 = severity*frequency*getLikelihood(frequency);
+                risk_4 = severity*getLikelihood(frequency);
                 weight_ImproperDependency = Double.valueOf(entry.getValue().getCount());
                 return risk_4;
             }
@@ -297,7 +325,7 @@ public class ReportService {
             }else {
                 severity = Double.valueOf(Minimal);
             }
-            risk_6 = severity*frequency*getLikelihood(frequency);
+            risk_6 = severity*getLikelihood(frequency);
             return risk_6;
         }
 
@@ -317,11 +345,10 @@ public class ReportService {
             if (propertiesSet.size() > 0) {
                 properties = propertiesSet.iterator().next();
 
-                if(properties.getProperty("realm" ).equals(""))
-                {
+                if(properties ==null){
                     severity = Double.valueOf(Float.valueOf(Major));
                     frequency = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
-                    risk_7 = severity * getLikelihood(frequency) * frequency;
+                    risk_7 = severity * getLikelihood(frequency);
                     weight_Caching = Double.valueOf(Float.valueOf(responseContext.getRestEntityContexts().size()));
                     return risk_7;
                 }
@@ -342,7 +369,7 @@ public class ReportService {
         {
             severity = Double.valueOf(Float.valueOf(Major));
             frequency = Double.valueOf(esbService.getESBContext(request).getCandidateESBs().size());
-            risk_8 = severity * getLikelihood(frequency) * frequency;
+            risk_8 = severity * getLikelihood(frequency);
             weight_ESBScore = Double.valueOf(esbService.getESBContext(request).getCandidateESBs().size());
             return risk_8;
         }
@@ -366,6 +393,8 @@ public class ReportService {
         double risk_APIGateway = getAPIGatewayResponse(request);
 
         double risk_network = getNetworkCommunication(request);
+
+        //double risk_network = 0.00;
 
         double risk_AccessControl = getAccessControl(request);
 
@@ -440,6 +469,36 @@ public class ReportService {
             synkRisk =0.00;
         }
         return synkRisk;
+
+    }
+
+    public void getDataFromExcel() throws IOException {
+        String filename = "D:\\Report.csv";
+        HSSFWorkbook workbook = new HSSFWorkbook();
+        HSSFSheet sheet = workbook.createSheet("Report");
+        HSSFRow rowhead = sheet.createRow((short)0);
+
+        rowhead.createCell(0).setCellValue("id");
+        rowhead.createCell(1).setCellValue("risk_score");
+        rowhead.createCell(2).setCellValue("time_taken");
+
+        List<Report> reports = reportRepository.findAll();
+
+        int rowid = 1;
+        for (Report report: reports)
+        {
+            HSSFRow row = sheet.createRow(rowid++);
+            int i=0;
+            row.createCell(i).setCellValue(report.getId());
+            row.createCell(i+1).setCellValue(report.getRisk_score());
+            row.createCell(i+2).setCellValue(report.getTimeTaken());
+        }
+
+        FileOutputStream fileOut = new FileOutputStream(filename);
+        workbook.write(fileOut);
+
+        fileOut.close();
+        workbook.close();
 
     }
 
